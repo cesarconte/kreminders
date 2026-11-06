@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Recordatorios
+GenericName=Gestor de Tareas y Recordatorios
+Comment=Réplica de Apple Reminders para KDE Plasma 6 Wayland
+Exec=kreminders %U
+Icon=reminders
+Type=Application
+Terminal=false
+Categories=Office;Calendar;Utility;Qt;KDE;
+StartupNotify=true
+StartupWMClass=kreminders
+Keywords=reminders;recordatorios;todo;tareas;apple;macOS;
