@@ -7,9 +7,14 @@
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickStyle>
 
 int main(int argc, char *argv[])
 {
+    if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE")) {
+        QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
+    }
+
     QApplication app(argc, argv);
     KLocalizedString::setApplicationDomain("kreminders");
     app.setApplicationName(QStringLiteral("kreminders"));

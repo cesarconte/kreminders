@@ -11,16 +11,24 @@ ApplicationWindow {
     minimumWidth: 760
     minimumHeight: 500
     title: qsTr("Recordatorios")
-    color: "#F5F5F7"
 
-    // Colors matching macOS Golden Gate
-    readonly property color sidebarBg: "#EBEBF0"
-    readonly property color contentBg: "#FFFFFF"
-    readonly property color cardBg: "#FFFFFF"
-    readonly property color cardBorder: "#E0E0E5"
-    readonly property color textPrimary: "#1C1C1E"
-    readonly property color textSecondary: "#8E8E93"
-    readonly property color dividerColor: "#D1D1D6"
+    // Dynamic Theme Integration with KDE Plasma (Breeze / BreezeDark)
+    readonly property bool isDark: remindersManager.isDark
+    readonly property color highlightColor: remindersManager.highlightColor
+
+    readonly property color sidebarBg: isDark ? "#202326" : "#EBEBF0"
+    readonly property color contentBg: isDark ? "#141618" : "#FFFFFF"
+    readonly property color cardBg: isDark ? "#2A2E32" : "#FFFFFF"
+    readonly property color cardBorder: isDark ? "#373B3F" : "#E0E0E5"
+    readonly property color inputBg: isDark ? "#2A2E32" : "#FFFFFF"
+    readonly property color quickAddBg: isDark ? "#202326" : "#F5F5F7"
+    readonly property color textPrimary: isDark ? "#FCFCFC" : "#1C1C1E"
+    readonly property color textSecondary: isDark ? "#9DA3A8" : "#8E8E93"
+    readonly property color dividerColor: isDark ? "#31363B" : "#D1D1D6"
+    readonly property color selectionBg: isDark ? "#2C343D" : "#D6D6DC"
+    readonly property color hoverBg: isDark ? "#272A2E" : "#E0E0E6"
+
+    color: root.sidebarBg
 
     RowLayout {
         anchors.fill: parent
@@ -46,8 +54,9 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
                     radius: 8
-                    color: "#FFFFFF"
+                    color: root.inputBg
                     border.color: root.cardBorder
+                    border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -58,7 +67,8 @@ ApplicationWindow {
                         Text {
                             text: "🔍"
                             font.pixelSize: 12
-                            opacity: 0.6
+                            color: root.textSecondary
+                            opacity: 0.7
                         }
 
                         TextInput {
@@ -190,7 +200,7 @@ ApplicationWindow {
                             width: customListView.width
                             height: 38
                             radius: 8
-                            color: (remindersManager.currentFilter === model.id) ? "#D6D6DC" : (listMouse.containsMouse ? "#E0E0E6" : "transparent")
+                            color: (remindersManager.currentFilter === model.id) ? root.selectionBg : (listMouse.containsMouse ? root.hoverBg : "transparent")
 
                             MouseArea {
                                 id: listMouse
@@ -269,14 +279,14 @@ ApplicationWindow {
                             text: "＋"
                             font.bold: true
                             font.pixelSize: 15
-                            color: "#007AFF"
+                            color: root.highlightColor
                         }
 
                         Text {
                             text: qsTr("Añadir lista")
                             font.pixelSize: 13
                             font.weight: Font.DemiBold
-                            color: "#007AFF"
+                            color: root.highlightColor
                         }
 
                         Item { Layout.fillWidth: true }
@@ -361,8 +371,9 @@ ApplicationWindow {
                             width: tasksListView.width
                             height: taskCol.implicitHeight + 16
                             radius: 10
-                            color: rowMouse.containsMouse ? "#F9F9FB" : "#FFFFFF"
-                            border.color: rowMouse.containsMouse ? "#E5E5EA" : "transparent"
+                            color: rowMouse.containsMouse ? root.hoverBg : "transparent"
+                            border.color: rowMouse.containsMouse ? root.cardBorder : "transparent"
+                            border.width: 1
 
                             MouseArea {
                                 id: rowMouse
@@ -382,7 +393,7 @@ ApplicationWindow {
                                     height: 22
                                     radius: 11
                                     color: model.isCompleted ? model.listColor : "transparent"
-                                    border.color: model.isCompleted ? model.listColor : "#C7C7CC"
+                                    border.color: model.isCompleted ? model.listColor : (root.isDark ? "#5C6166" : "#C7C7CC")
                                     border.width: 1.8
 
                                     Text {
@@ -449,7 +460,7 @@ ApplicationWindow {
                                             width: listBadgeText.implicitWidth + 8
                                             radius: 4
                                             color: model.listColor
-                                            opacity: 0.15
+                                            opacity: root.isDark ? 0.25 : 0.15
                                         }
                                         Text {
                                             id: listBadgeText
@@ -498,7 +509,7 @@ ApplicationWindow {
                                 anchors.leftMargin: 42
                                 anchors.right: parent.right
                                 height: 0.8
-                                color: "#E5E5EA"
+                                color: root.dividerColor
                             }
                         }
                     }
@@ -509,8 +520,9 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 46
                     radius: 10
-                    color: "#F5F5F7"
+                    color: root.quickAddBg
                     border.color: root.cardBorder
+                    border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -547,8 +559,41 @@ ApplicationWindow {
                         }
 
                         Button {
+                            id: addBtn
                             text: qsTr("Añadir")
                             enabled: newReminderInput.text.trim().length > 0
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+
+                            contentItem: Text {
+                                text: addBtn.text
+                                font: addBtn.font
+                                opacity: addBtn.enabled ? 1.0 : 0.6
+                                color: addBtn.enabled ? "#FFFFFF" : (root.isDark ? "#7A8086" : "#8E8E93")
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            background: Rectangle {
+                                implicitWidth: 74
+                                implicitHeight: 30
+                                radius: 6
+                                color: {
+                                    if (!addBtn.enabled) {
+                                        return root.isDark ? "#2C3034" : "#E2E2E6";
+                                    }
+                                    if (addBtn.down) {
+                                        return Qt.darker(remindersManager.currentColor, 1.2);
+                                    }
+                                    if (addBtn.hovered) {
+                                        return Qt.lighter(remindersManager.currentColor, 1.1);
+                                    }
+                                    return remindersManager.currentColor;
+                                }
+                                border.color: addBtn.enabled ? Qt.darker(remindersManager.currentColor, 1.15) : "transparent"
+                                border.width: addBtn.enabled ? 1 : 0
+                            }
+
                             onClicked: {
                                 if (newReminderInput.text.trim().length > 0) {
                                     remindersManager.addReminder(newReminderInput.text.trim(), "", new Date(), false, false, 0)
@@ -601,7 +646,7 @@ ApplicationWindow {
                         height: 26
                         radius: 13
                         color: modelData
-                        border.color: (newListDialog.selectedColor === modelData) ? "#1C1C1E" : "transparent"
+                        border.color: (newListDialog.selectedColor === modelData) ? (root.isDark ? "#FFFFFF" : "#1C1C1E") : "transparent"
                         border.width: 2.5
 
                         MouseArea {

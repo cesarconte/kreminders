@@ -10,11 +10,17 @@ Rectangle {
     property bool isSelected: false
     property bool isWide: false
 
+    property color cardBg: root.cardBg
+    property color cardBorderColor: root.cardBorder
+    property color textColor: root.textPrimary
+    property color textSubColor: root.textSecondary
+    property color hoverColor: root.hoverBg
+
     signal clicked()
 
     radius: 10
-    color: isSelected ? "#FFFFFF" : (cardMouse.containsMouse ? "#F2F2F7" : "#FFFFFF")
-    border.color: isSelected ? badgeColor : "#E5E5EA"
+    color: isSelected ? cardBg : (cardMouse.containsMouse ? hoverColor : cardBg)
+    border.color: isSelected ? badgeColor : cardBorderColor
     border.width: isSelected ? 1.8 : 1
 
     MouseArea {
@@ -56,7 +62,7 @@ Rectangle {
             text: card.countValue.toString()
             font.pixelSize: 22
             font.weight: Font.Bold
-            color: "#1C1C1E"
+            color: card.textColor
         }
 
         // Label
@@ -68,7 +74,7 @@ Rectangle {
             text: card.titleText
             font.pixelSize: 13
             font.weight: Font.DemiBold
-            color: card.isSelected ? card.badgeColor : "#8E8E93"
+            color: card.isSelected ? card.badgeColor : card.textSubColor
         }
     }
 }

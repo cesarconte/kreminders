@@ -28,9 +28,15 @@ class RemindersManager : public QObject {
     Q_PROPERTY(QString currentColor READ currentColor NOTIFY currentFilterChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchQueryChanged)
 
+    Q_PROPERTY(bool isDark READ isDark NOTIFY themeChanged)
+    Q_PROPERTY(QString highlightColor READ highlightColor NOTIFY themeChanged)
+
 public:
     explicit RemindersManager(QObject *parent = nullptr);
     ~RemindersManager() override;
+
+    bool isDark() const;
+    QString highlightColor() const;
 
     TasksModel* tasksModel() const { return m_tasksModel; }
     CustomListsModel* listsModel() const { return m_listsModel; }
@@ -65,10 +71,14 @@ public:
     ReminderList getList(const QString &listId) const;
     int countForList(const QString &listId) const;
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 Q_SIGNALS:
     void countsChanged();
     void currentFilterChanged();
     void searchQueryChanged();
+    void themeChanged();
 
 private Q_SLOTS:
     void checkDueNotifications();

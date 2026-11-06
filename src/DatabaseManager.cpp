@@ -192,12 +192,10 @@ QVector<ReminderItem> DatabaseManager::getReminders(const QString &filter, const
     QVector<ReminderItem> items;
     QString sql = QStringLiteral("SELECT id, list_id, title, notes, due_date, has_due_date, is_completed, is_flagged, priority, created_date, completed_date FROM reminders WHERE 1=1 ");
 
-    const QDate today = QDate::currentDate();
-    const QString todayStart = QDateTime(today, QTime(0, 0, 0)).toString(Qt::ISODate);
-    const QString todayEnd = QDateTime(today, QTime(23, 59, 59)).toString(Qt::ISODate);
+    const QString todayDateStr = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
 
     if (filter == QStringLiteral("today")) {
-        sql += QStringLiteral("AND is_completed = 0 AND has_due_date = 1 AND due_date >= '") + todayStart + QStringLiteral("' AND due_date <= '") + todayEnd + QStringLiteral("' ");
+        sql += QStringLiteral("AND is_completed = 0 AND has_due_date = 1 AND substr(due_date, 1, 10) <= '") + todayDateStr + QStringLiteral("' ");
     } else if (filter == QStringLiteral("scheduled")) {
         sql += QStringLiteral("AND is_completed = 0 AND has_due_date = 1 ");
     } else if (filter == QStringLiteral("all")) {
@@ -352,14 +350,11 @@ bool DatabaseManager::deleteReminder(const QString &id)
 
 int DatabaseManager::countToday()
 {
-    const QDate today = QDate::currentDate();
-    const QString todayStart = QDateTime(today, QTime(0, 0, 0)).toString(Qt::ISODate);
-    const QString todayEnd = QDateTime(today, QTime(23, 59, 59)).toString(Qt::ISODate);
+    const QString todayDateStr = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
 
     QSqlQuery q;
-    q.prepare(QStringLiteral("SELECT COUNT(*) FROM reminders WHERE is_completed = 0 AND has_due_date = 1 AND due_date >= ? AND due_date <= ?;"));
-    q.addBindValue(todayStart);
-    q.addBindValue(todayEnd);
+    q.prepare(QStringLiteral("SELECT COUNT(*) FROM reminders WHERE is_completed = 0 AND has_due_date = 1 AND substr(due_date, 1, 10) <= ?;"));
+    q.addBindValue(todayDateStr);
     if (q.exec() && q.next()) return q.value(0).toInt();
     return 0;
 }

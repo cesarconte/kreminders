@@ -1,8 +1,11 @@
 #include "RemindersManager.h"
 #include "DatabaseManager.h"
 
+#include <QApplication>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QPalette>
+#include <QStyleHints>
 
 RemindersManager::RemindersManager(QObject *parent)
     : QObject(parent)
@@ -14,12 +17,38 @@ RemindersManager::RemindersManager(QObject *parent)
     loadLists();
     updateFilteredTasks();
 
+    connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged, this, [this](Qt::ColorScheme) {
+        Q_EMIT themeChanged();
+    });
+    qApp->installEventFilter(this);
+
     connect(m_notifyTimer, &QTimer::timeout, this, &RemindersManager::checkDueNotifications);
     m_notifyTimer->start(30000); // Check notifications every 30 seconds
 }
 
 RemindersManager::~RemindersManager()
 {
+}
+
+bool RemindersManager::isDark() const
+{
+    const auto scheme = qApp->styleHints()->colorScheme();
+    if (scheme == Qt::ColorScheme::Dark) return true;
+    if (scheme == Qt::ColorScheme::Light) return false;
+    return qApp->palette().color(QPalette::Window).lightnessF() < 0.5;
+}
+
+bool RemindersManager::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::PaletteChange || event->type() == QEvent::ThemeChange) {
+        Q_EMIT themeChanged();
+    }
+    return QObject::eventFilter(watched, event);
+}
+
+QString RemindersManager::highlightColor() const
+{
+    return qApp->palette().color(QPalette::Highlight).name();
 }
 
 void RemindersManager::loadLists()
