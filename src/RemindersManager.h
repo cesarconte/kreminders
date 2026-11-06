@@ -5,6 +5,7 @@
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QObject>
+#include <QSet>
 #include <QTimer>
 #include <QVector>
 
@@ -73,8 +74,7 @@ private Q_SLOTS:
     void checkDueNotifications();
 
 private:
-    void loadData();
-    void saveData();
+    void loadLists();
     void updateFilteredTasks();
     void sendNotification(const ReminderItem &item);
 
@@ -82,7 +82,6 @@ private:
     QString m_searchQuery;
 
     QVector<ReminderList> m_lists;
-    QVector<ReminderItem> m_reminders;
     QVector<ReminderItem> m_filteredReminders;
     QSet<QString> m_notifiedIds;
 

@@ -1,13 +1,8 @@
 #include "RemindersManager.h"
+#include "DatabaseManager.h"
 
 #include <QDBusInterface>
 #include <QDBusReply>
-#include <QDir>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QStandardPaths>
 
 RemindersManager::RemindersManager(QObject *parent)
     : QObject(parent)
@@ -15,184 +10,56 @@ RemindersManager::RemindersManager(QObject *parent)
     , m_listsModel(new CustomListsModel(this, this))
     , m_notifyTimer(new QTimer(this))
 {
-    loadData();
+    DatabaseManager::instance().init();
+    loadLists();
     updateFilteredTasks();
 
     connect(m_notifyTimer, &QTimer::timeout, this, &RemindersManager::checkDueNotifications);
-    m_notifyTimer->start(30000); // Check every 30 seconds
+    m_notifyTimer->start(30000); // Check notifications every 30 seconds
 }
 
 RemindersManager::~RemindersManager()
 {
-    saveData();
 }
 
-void RemindersManager::loadData()
+void RemindersManager::loadLists()
 {
-    const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dataDir);
-    const QString filePath = dataDir + QStringLiteral("/reminders.json");
-
-    QFile file(filePath);
-    if (file.open(QIODevice::ReadOnly)) {
-        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        const QJsonObject root = doc.object();
-
-        m_lists.clear();
-        const QJsonArray listsArray = root.value(QStringLiteral("lists")).toArray();
-        for (const auto &val : listsArray) {
-            m_lists.append(ReminderList::fromJson(val.toObject()));
-        }
-
-        m_reminders.clear();
-        const QJsonArray remindersArray = root.value(QStringLiteral("reminders")).toArray();
-        for (const auto &val : remindersArray) {
-            m_reminders.append(ReminderItem::fromJson(val.toObject()));
-        }
-    }
-
-    if (m_lists.isEmpty()) {
-        ReminderList defaultList;
-        defaultList.id = QStringLiteral("default");
-        defaultList.name = QStringLiteral("Recordatorios");
-        defaultList.color = QStringLiteral("#007AFF");
-        defaultList.icon = QStringLiteral("list");
-        m_lists.append(defaultList);
-
-        ReminderList personalList;
-        personalList.id = QStringLiteral("personal");
-        personalList.name = QStringLiteral("Personal");
-        personalList.color = QStringLiteral("#FF9500");
-        personalList.icon = QStringLiteral("user");
-        m_lists.append(personalList);
-
-        ReminderList workList;
-        workList.id = QStringLiteral("work");
-        workList.name = QStringLiteral("Trabajo");
-        workList.color = QStringLiteral("#34C759");
-        workList.icon = QStringLiteral("briefcase");
-        m_lists.append(workList);
-
-        // Sample tasks for initial out-of-the-box delight
-        ReminderItem sample1;
-        sample1.listId = QStringLiteral("default");
-        sample1.title = QStringLiteral("Probar la nueva app Recordatorios");
-        sample1.notes = QStringLiteral("Diseño 1:1 con macOS Golden Gate en KDE Plasma 6");
-        sample1.hasDueDate = true;
-        sample1.dueDate = QDateTime::currentDateTime();
-        sample1.isFlagged = true;
-        sample1.priority = 2;
-        m_reminders.append(sample1);
-
-        ReminderItem sample2;
-        sample2.listId = QStringLiteral("default");
-        sample2.title = QStringLiteral("Organizar lista de compras");
-        sample2.notes = QStringLiteral("Frutas, café y pan");
-        sample2.hasDueDate = false;
-        m_reminders.append(sample2);
-
-        saveData();
-    }
-}
-
-void RemindersManager::saveData()
-{
-    const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dataDir);
-    const QString filePath = dataDir + QStringLiteral("/reminders.json");
-
-    QJsonObject root;
-    QJsonArray listsArray;
-    for (const auto &list : m_lists) {
-        listsArray.append(list.toJson());
-    }
-    root[QStringLiteral("lists")] = listsArray;
-
-    QJsonArray remindersArray;
-    for (const auto &item : m_reminders) {
-        remindersArray.append(item.toJson());
-    }
-    root[QStringLiteral("reminders")] = remindersArray;
-
-    QFile file(filePath);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-    }
+    m_lists = DatabaseManager::instance().getLists();
 }
 
 int RemindersManager::todayCount() const
 {
-    const QDate today = QDate::currentDate();
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted && item.hasDueDate && item.dueDate.date() == today) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countToday();
 }
 
 int RemindersManager::scheduledCount() const
 {
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted && item.hasDueDate) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countScheduled();
 }
 
 int RemindersManager::allCount() const
 {
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countAll();
 }
 
 int RemindersManager::flaggedCount() const
 {
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted && item.isFlagged) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countFlagged();
 }
 
 int RemindersManager::completedCount() const
 {
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (item.isCompleted) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countCompleted();
 }
 
 int RemindersManager::countForList(const QString &listId) const
 {
-    int count = 0;
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted && item.listId == listId) {
-            count++;
-        }
-    }
-    return count;
+    return DatabaseManager::instance().countForList(listId);
 }
 
 ReminderList RemindersManager::getList(const QString &listId) const
 {
-    for (const auto &l : m_lists) {
-        if (l.id == listId) return l;
-    }
-    return ReminderList{};
+    return DatabaseManager::instance().getList(listId);
 }
 
 QString RemindersManager::currentTitle() const
@@ -252,45 +119,7 @@ void RemindersManager::selectCustomList(const QString &listId)
 
 void RemindersManager::updateFilteredTasks()
 {
-    m_filteredReminders.clear();
-    const QDate today = QDate::currentDate();
-
-    for (const auto &item : m_reminders) {
-        if (!m_searchQuery.isEmpty()) {
-            if (!item.title.contains(m_searchQuery, Qt::CaseInsensitive) &&
-                !item.notes.contains(m_searchQuery, Qt::CaseInsensitive)) {
-                continue;
-            }
-        }
-
-        if (m_currentFilter == QStringLiteral("today")) {
-            if (!item.isCompleted && item.hasDueDate && item.dueDate.date() == today) {
-                m_filteredReminders.append(item);
-            }
-        } else if (m_currentFilter == QStringLiteral("scheduled")) {
-            if (!item.isCompleted && item.hasDueDate) {
-                m_filteredReminders.append(item);
-            }
-        } else if (m_currentFilter == QStringLiteral("all")) {
-            if (!item.isCompleted) {
-                m_filteredReminders.append(item);
-            }
-        } else if (m_currentFilter == QStringLiteral("flagged")) {
-            if (!item.isCompleted && item.isFlagged) {
-                m_filteredReminders.append(item);
-            }
-        } else if (m_currentFilter == QStringLiteral("completed")) {
-            if (item.isCompleted) {
-                m_filteredReminders.append(item);
-            }
-        } else {
-            // Specific Custom List
-            if (item.listId == m_currentFilter) {
-                m_filteredReminders.append(item);
-            }
-        }
-    }
-
+    m_filteredReminders = DatabaseManager::instance().getReminders(m_currentFilter, m_searchQuery);
     m_tasksModel->refresh();
     m_listsModel->refresh();
     Q_EMIT countsChanged();
@@ -306,79 +135,50 @@ void RemindersManager::addReminder(const QString &title, const QString &notes, c
     item.isFlagged = isFlagged;
     item.priority = priority;
 
+    const QString defaultListId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
+
     if (m_currentFilter == QStringLiteral("today")) {
-        item.listId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
+        item.listId = defaultListId;
         item.hasDueDate = true;
         item.dueDate = QDateTime::currentDateTime();
     } else if (m_currentFilter == QStringLiteral("scheduled")) {
-        item.listId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
+        item.listId = defaultListId;
         item.hasDueDate = true;
         if (!dueDate.isValid()) item.dueDate = QDateTime::currentDateTime().addDays(1);
     } else if (m_currentFilter == QStringLiteral("flagged")) {
-        item.listId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
+        item.listId = defaultListId;
         item.isFlagged = true;
     } else if (m_currentFilter == QStringLiteral("all") || m_currentFilter == QStringLiteral("completed")) {
-        item.listId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
+        item.listId = defaultListId;
     } else {
         item.listId = m_currentFilter;
     }
 
-    m_reminders.prepend(item);
-    saveData();
+    DatabaseManager::instance().addReminder(item);
     updateFilteredTasks();
 }
 
 void RemindersManager::toggleCompleted(const QString &id)
 {
-    for (auto &item : m_reminders) {
-        if (item.id == id) {
-            item.isCompleted = !item.isCompleted;
-            item.completedDate = item.isCompleted ? QDateTime::currentDateTime() : QDateTime();
-            break;
-        }
-    }
-    saveData();
+    DatabaseManager::instance().toggleCompleted(id);
     updateFilteredTasks();
 }
 
 void RemindersManager::toggleFlagged(const QString &id)
 {
-    for (auto &item : m_reminders) {
-        if (item.id == id) {
-            item.isFlagged = !item.isFlagged;
-            break;
-        }
-    }
-    saveData();
+    DatabaseManager::instance().toggleFlagged(id);
     updateFilteredTasks();
 }
 
 void RemindersManager::updateReminder(const QString &id, const QString &title, const QString &notes, const QDateTime &dueDate, bool hasDueDate, bool isFlagged, int priority)
 {
-    for (auto &item : m_reminders) {
-        if (item.id == id) {
-            item.title = title.trimmed();
-            item.notes = notes.trimmed();
-            item.dueDate = dueDate;
-            item.hasDueDate = hasDueDate;
-            item.isFlagged = isFlagged;
-            item.priority = priority;
-            break;
-        }
-    }
-    saveData();
+    DatabaseManager::instance().updateReminder(id, title.trimmed(), notes.trimmed(), dueDate, hasDueDate, isFlagged, priority);
     updateFilteredTasks();
 }
 
 void RemindersManager::deleteReminder(const QString &id)
 {
-    for (int i = 0; i < m_reminders.size(); ++i) {
-        if (m_reminders[i].id == id) {
-            m_reminders.removeAt(i);
-            break;
-        }
-    }
-    saveData();
+    DatabaseManager::instance().deleteReminder(id);
     updateFilteredTasks();
 }
 
@@ -388,9 +188,9 @@ void RemindersManager::addList(const QString &name, const QString &color, const 
     list.name = name.trimmed();
     list.color = color;
     list.icon = icon;
-    m_lists.append(list);
 
-    saveData();
+    DatabaseManager::instance().addList(list);
+    loadLists();
     m_listsModel->refresh();
     Q_EMIT countsChanged();
 
@@ -399,18 +199,9 @@ void RemindersManager::addList(const QString &name, const QString &color, const 
 
 void RemindersManager::deleteList(const QString &listId)
 {
-    for (int i = 0; i < m_lists.size(); ++i) {
-        if (m_lists[i].id == listId) {
-            m_lists.removeAt(i);
-            break;
-        }
-    }
-    // Remove tasks associated with this list
-    m_reminders.removeIf([&listId](const ReminderItem &item) {
-        return item.listId == listId;
-    });
+    DatabaseManager::instance().deleteList(listId);
+    loadLists();
 
-    saveData();
     if (m_currentFilter == listId) {
         selectSmartList(QStringLiteral("today"));
     } else {
@@ -420,13 +211,11 @@ void RemindersManager::deleteList(const QString &listId)
 
 void RemindersManager::checkDueNotifications()
 {
-    const QDateTime now = QDateTime::currentDateTime();
-    for (const auto &item : m_reminders) {
-        if (!item.isCompleted && item.hasDueDate && item.dueDate <= now) {
-            if (!m_notifiedIds.contains(item.id)) {
-                sendNotification(item);
-                m_notifiedIds.insert(item.id);
-            }
+    const auto due = DatabaseManager::instance().getDueReminders(QDateTime::currentDateTime());
+    for (const auto &item : due) {
+        if (!m_notifiedIds.contains(item.id)) {
+            sendNotification(item);
+            m_notifiedIds.insert(item.id);
         }
     }
 }
