@@ -37,4 +37,9 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
 
 add_subdirectory(src)
 
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)

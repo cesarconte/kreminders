@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import CachyOS.UI
 
 Rectangle {
     id: card
@@ -10,18 +11,17 @@ Rectangle {
     property bool isSelected: false
     property bool isWide: false
 
-    property color cardBg: root.cardBg
-    property color cardBorderColor: root.cardBorder
-    property color textColor: root.textPrimary
-    property color textSubColor: root.textSecondary
-    property color hoverColor: root.hoverBg
-
     signal clicked()
 
-    radius: 10
-    color: isSelected ? cardBg : (cardMouse.containsMouse ? hoverColor : cardBg)
-    border.color: isSelected ? badgeColor : cardBorderColor
-    border.width: isSelected ? 1.8 : 1
+    radius: CachyTheme.radiusMedium
+    color: isSelected
+        ? CachyTheme.withAlpha(badgeColor, 0.14)
+        : (cardMouse.containsMouse ? CachyTheme.cardBackgroundHover : CachyTheme.cardBackground)
+    border.color: isSelected ? badgeColor : (cardMouse.containsMouse ? CachyTheme.withAlpha(badgeColor, 0.5) : CachyTheme.specularBorder)
+    border.width: isSelected ? 1.5 : 1
+
+    Behavior on color { ColorAnimation { duration: CachyTheme.animFast } }
+    Behavior on border.color { ColorAnimation { duration: CachyTheme.animFast } }
 
     MouseArea {
         id: cardMouse
@@ -62,7 +62,7 @@ Rectangle {
             text: card.countValue.toString()
             font.pixelSize: 22
             font.weight: Font.Bold
-            color: card.textColor
+            color: CachyTheme.textPrimary
         }
 
         // Label
@@ -74,7 +74,7 @@ Rectangle {
             text: card.titleText
             font.pixelSize: 13
             font.weight: Font.DemiBold
-            color: card.isSelected ? card.badgeColor : card.textSubColor
+            color: card.isSelected ? card.badgeColor : CachyTheme.textSecondary
         }
     }
 }

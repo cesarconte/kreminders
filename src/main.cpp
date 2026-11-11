@@ -4,13 +4,19 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
 
 int main(int argc, char *argv[])
 {
+    // Force native Wayland backend with real alpha buffer for Liquid Glass blur
+    qputenv("QT_QPA_PLATFORM", "wayland;xcb");
+    QQuickWindow::setDefaultAlphaBuffer(true);
+
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE")) {
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
     }
@@ -31,6 +37,9 @@ int main(int argc, char *argv[])
     auto *manager = new RemindersManager(&app);
 
     QQmlApplicationEngine engine;
+    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/lib/qt6/qml"));
+    engine.addImportPath(QStringLiteral("/home/cesar/Proyectos/cachyos-ui/build/src"));
+
     engine.rootContext()->setContextProperty(QStringLiteral("remindersManager"), manager);
 
     const QUrl url(QStringLiteral("qrc:/qml/main.qml"));

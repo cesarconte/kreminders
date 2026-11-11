@@ -1,5 +1,4 @@
-add_executable(kreminders
-    main.cpp
+add_library(kreminders_core STATIC
     ReminderItem.h
     DatabaseManager.h
     DatabaseManager.cpp
@@ -8,7 +7,7 @@ add_executable(kreminders
     resources.qrc
 )
 
-target_link_libraries(kreminders PRIVATE
+target_link_libraries(kreminders_core PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
@@ -20,6 +19,17 @@ target_link_libraries(kreminders PRIVATE
     KF6::CoreAddons
     KF6::I18n
     KF6::Notifications
+)
+
+target_include_directories(kreminders_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(kreminders
+    main.cpp
+    resources.qrc
+)
+
+target_link_libraries(kreminders PRIVATE
+    kreminders_core
 )
 
 install(TARGETS kreminders DESTINATION ${KDE_INSTALL_BINDIR})
