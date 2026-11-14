@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("kreminders"));
     app.setApplicationDisplayName(QStringLiteral("Recordatorios"));
     app.setOrganizationDomain(QStringLiteral("cesar.org"));
-    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("reminders"), QIcon::fromTheme(QStringLiteral("gnome-todo"))));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("org.cesar.kreminders"), QIcon::fromTheme(QStringLiteral("reminders"))));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Recordatorios — Réplica nativa de Apple Reminders para KDE Plasma 6 en Wayland"));
