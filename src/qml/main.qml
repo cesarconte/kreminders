@@ -23,6 +23,23 @@ CachyWindow {
     showTrafficLights: true
 
     // =========================================================================
+    // INLINE DRAFT & SHORTCUT STATE (macOS Golden Gate UX)
+    // =========================================================================
+    property bool isDraftActive: false
+    signal draftRequested()
+
+    function startInlineDraft() {
+        root.isDraftActive = true;
+        tasksListView.positionViewAtEnd();
+        draftRequested();
+    }
+
+    Shortcut {
+        sequences: [StandardKey.New]
+        onActivated: root.startInlineDraft()
+    }
+
+    // =========================================================================
     // 1. HEADER CENTER: Reminders Title Pill
     // =========================================================================
     headerCenter: [
@@ -57,7 +74,7 @@ CachyWindow {
     ]
 
     // =========================================================================
-    // 2. HEADER ACTIONS: Quick Add Reminder Button (18px from right edge)
+    // 2. HEADER ACTIONS: Quick Add Reminder Button (macOS Golden Gate Toolbar +)
     // =========================================================================
     headerActions: [
         Row {
@@ -65,12 +82,13 @@ CachyWindow {
             anchors.verticalCenter: parent.verticalCenter
 
             CachyButton {
-                text: "＋ " + qsTr("Nuevo recordatorio")
-                primary: true
+                iconName: "add"
+                flat: true
+                implicitWidth: 32
                 implicitHeight: 28
-                onClicked: {
-                    newReminderDialog.open();
-                }
+                QQC2.ToolTip.text: qsTr("Nuevo recordatorio")
+                QQC2.ToolTip.visible: hovered
+                onClicked: root.startInlineDraft()
             }
         }
     ]
@@ -428,13 +446,46 @@ CachyWindow {
                             model: remindersManager.tasksModel
                             spacing: 6
 
+                            // Tap empty background space to start inline draft (macOS Golden Gate)
+                            TapHandler {
+                                onTapped: point => {
+                                    if (point.position.y > tasksListView.contentItem.childrenRect.height) {
+                                        root.startInlineDraft();
+                                    }
+                                }
+                            }
+
                             // Empty State Placeholder
-                            Text {
+                            ColumnLayout {
                                 anchors.centerIn: parent
-                                text: qsTr("No hay recordatorios")
-                                font.pixelSize: 15
-                                color: CachyTheme.textSecondary
-                                visible: tasksListView.count === 0
+                                spacing: 8
+                                visible: tasksListView.count === 0 && !root.isDraftActive
+
+                                CachyIcon {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    name: "calendar"
+                                    size: 38
+                                    color: CachyTheme.textMuted
+                                }
+
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: qsTr("No hay recordatorios")
+                                    font.pixelSize: 15
+                                    font.weight: Font.DemiBold
+                                    color: CachyTheme.textSecondary
+                                }
+
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: qsTr("Haz clic aquí o pulsa ＋ para añadir uno")
+                                    font.pixelSize: 12
+                                    color: CachyTheme.accentColor
+                                }
+
+                                TapHandler {
+                                    onTapped: root.startInlineDraft()
+                                }
                             }
 
                             delegate: Rectangle {
@@ -552,11 +603,34 @@ CachyWindow {
                                         }
                                     }
 
-                                    // Actions (Hover buttons: Flag, Delete)
+                                    // Actions (Hover buttons: Inspector (i), Flag, Delete)
                                     RowLayout {
                                         spacing: 6
                                         visible: rowHover.hovered
 
+                                        // Inspector button (i)
+                                        Rectangle {
+                                            width: 24
+                                            height: 24
+                                            radius: 12
+                                            color: infoHover.hovered ? CachyTheme.cardBackgroundHover : "transparent"
+                                            border.width: 1
+                                            border.color: infoHover.hovered ? CachyTheme.specularBorder : "transparent"
+
+                                            CachyIcon {
+                                                anchors.centerIn: parent
+                                                name: "info"
+                                                size: 13
+                                                color: CachyTheme.accentColor
+                                            }
+
+                                            HoverHandler { id: infoHover }
+                                            TapHandler {
+                                                onTapped: taskInspectorPopup.openForTask(taskRow.model)
+                                            }
+                                        }
+
+                                        // Flag button
                                         Rectangle {
                                             width: 24
                                             height: 24
@@ -566,7 +640,7 @@ CachyWindow {
                                                 anchors.centerIn: parent
                                                 name: "pin"
                                                 size: 13
-                                                color: taskRow.model.isFlagged ? "#FF9500" : CachyTheme.textMuted
+                                                color: taskRow.model.isFlagged ? "#FF9500" : CachyPalette.textMuted
                                             }
                                             HoverHandler { id: flagHover }
                                             TapHandler {
@@ -574,6 +648,7 @@ CachyWindow {
                                             }
                                         }
 
+                                        // Delete button
                                         Rectangle {
                                             width: 24
                                             height: 24
@@ -603,74 +678,94 @@ CachyWindow {
                                     color: CachyTheme.specularBorder
                                 }
                             }
-                        }
-                    }
 
-                    // Bottom Quick Add Input (Liquid Glass Card)
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        radius: CachyTheme.radiusMedium
-                        color: newReminderInput.activeFocus ? CachyTheme.cardBackgroundHover : CachyTheme.cardBackground
-                        border.color: newReminderInput.activeFocus ? CachyTheme.accentColor : CachyTheme.specularBorder
-                        border.width: 1
+                            // Inline Draft Row (macOS Golden Gate Inline Creation)
+                            footer: Component {
+                                Item {
+                                    id: draftFooterItem
+                                    width: tasksListView.width
+                                    height: root.isDraftActive ? 44 : 0
+                                    visible: root.isDraftActive
+                                    clip: true
 
-                        Behavior on border.color { ColorAnimation { duration: CachyTheme.animFast } }
-                        Behavior on color { ColorAnimation { duration: CachyTheme.animFast } }
+                                    Behavior on height { NumberAnimation { duration: CachyTheme.animFast } }
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 8
-                            spacing: 10
-
-                            Rectangle {
-                                width: 28
-                                height: 28
-                                radius: 14
-                                color: plusHover.hovered ? CachyTheme.cardBackgroundHover : "transparent"
-                                CachyIcon {
-                                    anchors.centerIn: parent
-                                    name: "add"
-                                    size: 16
-                                    color: remindersManager.currentColor
-                                }
-                                HoverHandler { id: plusHover }
-                                TapHandler {
-                                    onTapped: newReminderDialog.open()
-                                }
-                            }
-
-                            TextInput {
-                                id: newReminderInput
-                                Layout.fillWidth: true
-                                font.pixelSize: 14
-                                color: CachyTheme.textPrimary
-                                clip: true
-                                onAccepted: {
-                                    if (text.trim().length > 0) {
-                                        remindersManager.addReminder(text.trim(), "", new Date(), false, false, 0);
-                                        text = "";
+                                    Connections {
+                                        target: root
+                                        function onDraftRequested() {
+                                            inlineDraftInput.forceActiveFocus();
+                                        }
                                     }
-                                }
 
-                                Text {
-                                    text: qsTr("Nuevo recordatorio (presiona Enter para guardar)")
-                                    color: CachyTheme.textSecondary
-                                    visible: !newReminderInput.text && !newReminderInput.activeFocus
-                                    font.pixelSize: 14
-                                }
-                            }
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.topMargin: 2
+                                        anchors.bottomMargin: 2
+                                        radius: CachyTheme.radiusMedium
+                                        color: CachyTheme.cardBackgroundHover
+                                        border.color: CachyTheme.accentColor
+                                        border.width: 1
 
-                            CachyButton {
-                                text: qsTr("Añadir")
-                                primary: true
-                                enabled: newReminderInput.text.trim().length > 0
-                                implicitHeight: 32
-                                onClicked: {
-                                    if (newReminderInput.text.trim().length > 0) {
-                                        remindersManager.addReminder(newReminderInput.text.trim(), "", new Date(), false, false, 0);
-                                        newReminderInput.text = "";
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 12
+                                            spacing: 12
+
+                                            // Circular unchecked outline
+                                            Rectangle {
+                                                width: 22
+                                                height: 22
+                                                radius: 11
+                                                color: "transparent"
+                                                border.color: remindersManager.currentColor
+                                                border.width: 1.8
+                                            }
+
+                                            TextInput {
+                                                id: inlineDraftInput
+                                                Layout.fillWidth: true
+                                                font.pixelSize: 14
+                                                color: CachyTheme.textPrimary
+                                                clip: true
+                                                verticalAlignment: TextInput.AlignVCenter
+
+                                                Text {
+                                                    text: qsTr("Nuevo recordatorio...")
+                                                    color: CachyTheme.textSecondary
+                                                    visible: !inlineDraftInput.text && !inlineDraftInput.activeFocus
+                                                    font.pixelSize: 14
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                }
+
+                                                Keys.onEscapePressed: {
+                                                    inlineDraftInput.text = "";
+                                                    root.isDraftActive = false;
+                                                }
+
+                                                onAccepted: {
+                                                    var val = inlineDraftInput.text.trim();
+                                                    if (val.length > 0) {
+                                                        remindersManager.addReminder(val, "", new Date(), false, false, 0);
+                                                        inlineDraftInput.text = "";
+                                                        inlineDraftInput.forceActiveFocus();
+                                                    } else {
+                                                        root.isDraftActive = false;
+                                                    }
+                                                }
+
+                                                onActiveFocusChanged: {
+                                                    if (!activeFocus) {
+                                                        var val = inlineDraftInput.text.trim();
+                                                        if (val.length > 0) {
+                                                            remindersManager.addReminder(val, "", new Date(), false, false, 0);
+                                                            inlineDraftInput.text = "";
+                                                        }
+                                                        root.isDraftActive = false;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -768,79 +863,104 @@ CachyWindow {
         },
 
         // =====================================================================
-        // NEW REMINDER MODAL DIALOG
+        // TASK INSPECTOR POPOVER (macOS Golden Gate Inspector Sheet)
         // =====================================================================
-        QQC2.Dialog {
-            id: newReminderDialog
-            title: qsTr("Nuevo recordatorio")
-            standardButtons: QQC2.Dialog.Ok | QQC2.Dialog.Cancel
+        QQC2.Popup {
+            id: taskInspectorPopup
             anchors.centerIn: parent
-            width: 380
+            width: 360
             modal: true
+            focus: true
+            closePolicy: QQC2.Popup.CloseOnEscape | QQC2.Popup.CloseOnPressOutside
 
-            property bool hasDate: false
-            property date dueDate: new Date()
-            property bool isFlagged: false
+            property string taskId: ""
+            property string taskTitle: ""
+            property string taskNotes: ""
+            property date taskDueDate: new Date()
+            property bool taskHasDate: false
+            property bool taskIsFlagged: false
+            property int taskPriority: 0
+
+            function openForTask(taskModel) {
+                taskId = taskModel.id;
+                taskTitle = taskModel.title;
+                taskNotes = taskModel.notes;
+                taskDueDate = taskModel.dueDate ? taskModel.dueDate : new Date();
+                taskHasDate = taskModel.hasDueDate;
+                taskIsFlagged = taskModel.isFlagged;
+                taskPriority = taskModel.priority;
+                inspTitleInput.text = taskModel.title;
+                inspNotesInput.text = taskModel.notes;
+                open();
+            }
+
+            function saveAndClose() {
+                if (taskId.length > 0) {
+                    remindersManager.updateReminder(
+                        taskId,
+                        inspTitleInput.text.trim(),
+                        inspNotesInput.text.trim(),
+                        taskDueDate,
+                        taskHasDate,
+                        taskIsFlagged,
+                        taskPriority
+                    );
+                }
+                close();
+            }
 
             background: Rectangle {
                 radius: CachyTheme.radiusLarge
-                color: CachyTheme.isDark ? Qt.rgba(0.12, 0.12, 0.15, 0.98) : Qt.rgba(0.96, 0.97, 1.0, 0.98)
+                color: CachyTheme.isDark ? Qt.rgba(0.12, 0.12, 0.16, 0.98) : Qt.rgba(0.97, 0.98, 1.0, 0.98)
                 border.width: 1
                 border.color: CachyTheme.specularBorder
             }
 
-            onOpened: {
-                remTitleInput.text = "";
-                remNotesInput.text = "";
-                newReminderDialog.hasDate = false;
-                newReminderDialog.isFlagged = false;
-                remTitleInput.forceActiveFocus();
-            }
-
-            onAccepted: {
-                if (remTitleInput.text.trim().length > 0) {
-                    remindersManager.addReminder(
-                        remTitleInput.text.trim(),
-                        remNotesInput.text.trim(),
-                        dueDate,
-                        hasDate,
-                        isFlagged,
-                        0
-                    );
-                }
-            }
-
-            ColumnLayout {
+            contentItem: ColumnLayout {
                 spacing: 12
                 width: parent.width
+
+                // Header with "Detalles" and "Aceptar"
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Text {
+                        text: qsTr("Detalles")
+                        font.pixelSize: 15
+                        font.weight: Font.DemiBold
+                        color: CachyTheme.textPrimary
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    CachyButton {
+                        text: qsTr("Aceptar")
+                        primary: true
+                        implicitHeight: 28
+                        onClicked: taskInspectorPopup.saveAndClose()
+                    }
+                }
 
                 // Título
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 36
+                    Layout.preferredHeight: 34
                     radius: CachyTheme.radiusSmall
                     color: CachyTheme.cardBackground
                     border.width: 1
                     border.color: CachyTheme.specularBorder
 
                     TextInput {
-                        id: remTitleInput
+                        id: inspTitleInput
                         anchors.fill: parent
                         anchors.leftMargin: 10
                         anchors.rightMargin: 10
                         verticalAlignment: TextInput.AlignVCenter
+                        text: taskInspectorPopup.taskTitle
                         color: CachyTheme.textPrimary
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
                         clip: true
-
-                        Text {
-                            text: qsTr("Título del recordatorio")
-                            color: CachyTheme.textSecondary
-                            visible: !remTitleInput.text && !remTitleInput.activeFocus
-                            anchors.verticalCenter: parent.verticalCenter
-                            font.pixelSize: 13
-                        }
                     }
                 }
 
@@ -854,89 +974,186 @@ CachyWindow {
                     border.color: CachyTheme.specularBorder
 
                     TextEdit {
-                        id: remNotesInput
+                        id: inspNotesInput
                         anchors.fill: parent
                         anchors.margins: 8
+                        text: taskInspectorPopup.taskNotes
                         wrapMode: TextEdit.Wrap
                         color: CachyTheme.textPrimary
                         font.pixelSize: 12
                         clip: true
 
                         Text {
-                            text: qsTr("Notas o detalles adicionales...")
+                            text: qsTr("Notas o detalles...")
                             color: CachyTheme.textSecondary
-                            visible: !remNotesInput.text && !remNotesInput.activeFocus
+                            visible: !inspNotesInput.text && !inspNotesInput.activeFocus
                             font.pixelSize: 12
                         }
                     }
                 }
 
-                // Opciones: Fecha y Marca
+                // Separador fino
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: CachyTheme.specularBorder
+                }
+
+                // Fecha de vencimiento toggle
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 12
 
-                    // Toggle Con marca (Flag)
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 34
-                        radius: CachyTheme.radiusSmall
-                        color: newReminderDialog.isFlagged ? Qt.rgba(1, 0.58, 0, 0.15) : CachyTheme.cardBackground
-                        border.width: 1
-                        border.color: newReminderDialog.isFlagged ? "#FF9500" : CachyTheme.specularBorder
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 6
-                            CachyIcon {
-                                name: "pin"
-                                size: 14
-                                color: newReminderDialog.isFlagged ? "#FF9500" : CachyPalette.textMuted
-                            }
-                            Text {
-                                text: qsTr("Con marca")
-                                font.pixelSize: 12
-                                color: newReminderDialog.isFlagged ? "#FF9500" : CachyPalette.text
-                            }
+                    RowLayout {
+                        spacing: 8
+                        CachyIcon {
+                            name: "calendar"
+                            size: 16
+                            color: taskInspectorPopup.taskHasDate ? "#007AFF" : CachyPalette.textMuted
                         }
-
-                        TapHandler {
-                            onTapped: newReminderDialog.isFlagged = !newReminderDialog.isFlagged
+                        Text {
+                            text: qsTr("Fecha de vencimiento")
+                            font.pixelSize: 13
+                            color: CachyTheme.textPrimary
                         }
                     }
 
-                    // Toggle Fecha de vencimiento
+                    Item { Layout.fillWidth: true }
+
+                    QQC2.Switch {
+                        checked: taskInspectorPopup.taskHasDate
+                        onToggled: taskInspectorPopup.taskHasDate = checked
+                    }
+                }
+
+                // Date selector if active
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: taskInspectorPopup.taskHasDate
+                    spacing: 8
+
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: 30
                         radius: CachyTheme.radiusSmall
-                        color: newReminderDialog.hasDate ? Qt.rgba(0, 0.48, 1, 0.15) : CachyTheme.cardBackground
+                        color: CachyTheme.cardBackground
                         border.width: 1
-                        border.color: newReminderDialog.hasDate ? "#007AFF" : CachyTheme.specularBorder
+                        border.color: CachyTheme.specularBorder
 
                         RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 6
+                            anchors.fill: parent
+                            anchors.margins: 6
+
                             CachyIcon {
                                 name: "clock"
                                 size: 14
-                                color: newReminderDialog.hasDate ? "#007AFF" : CachyPalette.textMuted
+                                color: "#007AFF"
                             }
+
                             Text {
-                                text: newReminderDialog.hasDate ? newReminderDialog.dueDate.toLocaleDateString() : qsTr("Añadir fecha")
+                                Layout.fillWidth: true
+                                text: taskInspectorPopup.taskDueDate.toLocaleDateString()
                                 font.pixelSize: 12
-                                color: newReminderDialog.hasDate ? "#007AFF" : CachyPalette.text
+                                color: CachyTheme.textPrimary
                             }
                         }
+                    }
 
-                        TapHandler {
-                            onTapped: {
-                                newReminderDialog.hasDate = !newReminderDialog.hasDate;
-                                if (newReminderDialog.hasDate) {
-                                    newReminderDialog.dueDate = new Date();
+                    CachyButton {
+                        text: qsTr("Hoy")
+                        flat: true
+                        implicitHeight: 28
+                        onClicked: taskInspectorPopup.taskDueDate = new Date()
+                    }
+
+                    CachyButton {
+                        text: qsTr("Mañana")
+                        flat: true
+                        implicitHeight: 28
+                        onClicked: {
+                            var d = new Date();
+                            d.setDate(d.getDate() + 1);
+                            taskInspectorPopup.taskDueDate = d;
+                        }
+                    }
+                }
+
+                // Separador fino
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: CachyTheme.specularBorder
+                }
+
+                // Prioridad
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Text {
+                        text: qsTr("Prioridad")
+                        font.pixelSize: 13
+                        color: CachyTheme.textPrimary
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    RowLayout {
+                        spacing: 4
+                        Repeater {
+                            model: [
+                                { label: qsTr("Ninguna"), val: 0 },
+                                { label: "!", val: 1 },
+                                { label: "!!", val: 2 },
+                                { label: "!!!", val: 3 }
+                            ]
+                            Rectangle {
+                                required property var modelData
+                                width: Math.max(28, prioText.implicitWidth + 12)
+                                height: 26
+                                radius: 6
+                                color: (taskInspectorPopup.taskPriority === modelData.val) ? CachyTheme.accentColor : CachyTheme.cardBackground
+                                border.width: 1
+                                border.color: (taskInspectorPopup.taskPriority === modelData.val) ? CachyTheme.accentColor : CachyTheme.specularBorder
+
+                                Text {
+                                    id: prioText
+                                    anchors.centerIn: parent
+                                    text: parent.modelData.label
+                                    font.pixelSize: 11
+                                    font.weight: (taskInspectorPopup.taskPriority === parent.modelData.val) ? Font.DemiBold : Font.Normal
+                                    color: (taskInspectorPopup.taskPriority === parent.modelData.val) ? "#FFFFFF" : CachyTheme.textPrimary
+                                }
+
+                                TapHandler {
+                                    onTapped: taskInspectorPopup.taskPriority = parent.modelData.val
                                 }
                             }
                         }
+                    }
+                }
+
+                // Con marca (Flag)
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    RowLayout {
+                        spacing: 8
+                        CachyIcon {
+                            name: "pin"
+                            size: 16
+                            color: taskInspectorPopup.taskIsFlagged ? "#FF9500" : CachyPalette.textMuted
+                        }
+                        Text {
+                            text: qsTr("Con marca")
+                            font.pixelSize: 13
+                            color: CachyTheme.textPrimary
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    QQC2.Switch {
+                        checked: taskInspectorPopup.taskIsFlagged
+                        onToggled: taskInspectorPopup.taskIsFlagged = checked
                     }
                 }
             }
