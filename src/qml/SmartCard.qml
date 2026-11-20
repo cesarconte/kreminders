@@ -46,11 +46,21 @@ Rectangle {
             radius: 15
             color: card.badgeColor
 
+            CachyIcon {
+                id: cachyBadgeIcon
+                anchors.centerIn: parent
+                name: card.badgeIcon
+                size: 16
+                color: "#FFFFFF"
+                visible: card.badgeIcon.indexOf("/") === -1 && card.badgeIcon.length > 2 && !card.badgeIcon.match(/[\u{1F300}-\u{1F6FF}]/u)
+            }
+
             Text {
                 anchors.centerIn: parent
                 text: card.badgeIcon
                 font.pixelSize: 15
                 color: "#FFFFFF"
+                visible: !cachyBadgeIcon.visible
             }
         }
 

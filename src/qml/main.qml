@@ -40,9 +40,10 @@ CachyWindow {
                 anchors.centerIn: parent
                 spacing: 6
 
-                Text {
-                    text: "🗓️"
-                    font.pixelSize: 13
+                CachyIcon {
+                    name: "calendar"
+                    size: 14
+                    color: CachyTheme.accentColor
                 }
 
                 Text {
@@ -120,10 +121,10 @@ CachyWindow {
                             anchors.rightMargin: 10
                             spacing: 6
 
-                            Text {
-                                text: "🔍"
-                                font.pixelSize: 12
-                                opacity: 0.7
+                            CachyIcon {
+                                name: "search"
+                                size: 13
+                                color: CachyPalette.textMuted
                             }
 
                             TextInput {
@@ -168,7 +169,7 @@ CachyWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 64
                             badgeColor: "#007AFF"
-                            badgeIcon: "📅"
+                            badgeIcon: "calendar"
                             titleText: qsTr("Hoy")
                             countValue: remindersManager.todayCount
                             isSelected: remindersManager.currentFilter === "today"
@@ -180,7 +181,7 @@ CachyWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 64
                             badgeColor: "#FF3B30"
-                            badgeIcon: "⏰"
+                            badgeIcon: "clock"
                             titleText: qsTr("Programados")
                             countValue: remindersManager.scheduledCount
                             isSelected: remindersManager.currentFilter === "scheduled"
@@ -192,7 +193,7 @@ CachyWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 64
                             badgeColor: "#5856D6"
-                            badgeIcon: "📥"
+                            badgeIcon: "folder"
                             titleText: qsTr("Todos")
                             countValue: remindersManager.allCount
                             isSelected: remindersManager.currentFilter === "all"
@@ -204,7 +205,7 @@ CachyWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 64
                             badgeColor: "#FF9500"
-                            badgeIcon: "🚩"
+                            badgeIcon: "pin"
                             titleText: qsTr("Con marca")
                             countValue: remindersManager.flaggedCount
                             isSelected: remindersManager.currentFilter === "flagged"
@@ -217,7 +218,7 @@ CachyWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 46
                             badgeColor: "#34C759"
-                            badgeIcon: "✓"
+                            badgeIcon: "check"
                             titleText: qsTr("Completadas")
                             countValue: remindersManager.completedCount
                             isSelected: remindersManager.currentFilter === "completed"
@@ -507,16 +508,27 @@ CachyWindow {
                                             spacing: 8
                                             visible: taskRow.model.hasDueDate || taskRow.model.isFlagged
 
-                                            Text {
-                                                text: "⏰ " + taskRow.model.dueDateStr
-                                                font.pixelSize: 11
-                                                color: taskRow.model.isOverdue ? "#FF3B30" : CachyTheme.textSecondary
+                                            RowLayout {
+                                                spacing: 4
                                                 visible: taskRow.model.hasDueDate
+
+                                                CachyIcon {
+                                                    name: "clock"
+                                                    size: 11
+                                                    color: taskRow.model.isOverdue ? "#FF3B30" : CachyTheme.textSecondary
+                                                }
+
+                                                Text {
+                                                    text: taskRow.model.dueDateStr
+                                                    font.pixelSize: 11
+                                                    color: taskRow.model.isOverdue ? "#FF3B30" : CachyTheme.textSecondary
+                                                }
                                             }
 
-                                            Text {
-                                                text: "🚩"
-                                                font.pixelSize: 11
+                                            CachyIcon {
+                                                name: "pin"
+                                                size: 11
+                                                color: "#FF9500"
                                                 visible: taskRow.model.isFlagged
                                             }
 
@@ -550,10 +562,11 @@ CachyWindow {
                                             height: 24
                                             radius: 12
                                             color: flagHover.hovered ? CachyTheme.cardBackgroundHover : "transparent"
-                                            Text {
+                                            CachyIcon {
                                                 anchors.centerIn: parent
-                                                text: taskRow.model.isFlagged ? "🚩" : "🏳️"
-                                                font.pixelSize: 13
+                                                name: "pin"
+                                                size: 13
+                                                color: taskRow.model.isFlagged ? "#FF9500" : CachyTheme.textMuted
                                             }
                                             HoverHandler { id: flagHover }
                                             TapHandler {
@@ -566,10 +579,11 @@ CachyWindow {
                                             height: 24
                                             radius: 12
                                             color: delHover.hovered ? CachyTheme.cardBackgroundHover : "transparent"
-                                            Text {
+                                            CachyIcon {
                                                 anchors.centerIn: parent
-                                                text: "🗑️"
-                                                font.pixelSize: 13
+                                                name: "trash"
+                                                size: 13
+                                                color: "#FF3B30"
                                             }
                                             HoverHandler { id: delHover }
                                             TapHandler {
