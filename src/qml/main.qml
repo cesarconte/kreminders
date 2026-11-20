@@ -69,7 +69,7 @@ CachyWindow {
                 primary: true
                 implicitHeight: 28
                 onClicked: {
-                    newReminderInput.forceActiveFocus();
+                    newReminderDialog.open();
                 }
             }
         }
@@ -624,11 +624,21 @@ CachyWindow {
                             anchors.rightMargin: 8
                             spacing: 10
 
-                            Text {
-                                text: "＋"
-                                font.bold: true
-                                font.pixelSize: 18
-                                color: remindersManager.currentColor
+                            Rectangle {
+                                width: 28
+                                height: 28
+                                radius: 14
+                                color: plusHover.hovered ? CachyTheme.cardBackgroundHover : "transparent"
+                                CachyIcon {
+                                    anchors.centerIn: parent
+                                    name: "add"
+                                    size: 16
+                                    color: remindersManager.currentColor
+                                }
+                                HoverHandler { id: plusHover }
+                                TapHandler {
+                                    onTapped: newReminderDialog.open()
+                                }
                             }
 
                             TextInput {
@@ -753,6 +763,181 @@ CachyWindow {
                 if (listNameInput.text.trim().length > 0) {
                     remindersManager.addList(listNameInput.text.trim(), selectedColor, "list");
                     listNameInput.text = "";
+                }
+            }
+        },
+
+        // =====================================================================
+        // NEW REMINDER MODAL DIALOG
+        // =====================================================================
+        QQC2.Dialog {
+            id: newReminderDialog
+            title: qsTr("Nuevo recordatorio")
+            standardButtons: QQC2.Dialog.Ok | QQC2.Dialog.Cancel
+            anchors.centerIn: parent
+            width: 380
+            modal: true
+
+            property bool hasDate: false
+            property date dueDate: new Date()
+            property bool isFlagged: false
+
+            background: Rectangle {
+                radius: CachyTheme.radiusLarge
+                color: CachyTheme.isDark ? Qt.rgba(0.12, 0.12, 0.15, 0.98) : Qt.rgba(0.96, 0.97, 1.0, 0.98)
+                border.width: 1
+                border.color: CachyTheme.specularBorder
+            }
+
+            onOpened: {
+                remTitleInput.text = "";
+                remNotesInput.text = "";
+                newReminderDialog.hasDate = false;
+                newReminderDialog.isFlagged = false;
+                remTitleInput.forceActiveFocus();
+            }
+
+            onAccepted: {
+                if (remTitleInput.text.trim().length > 0) {
+                    remindersManager.addReminder(
+                        remTitleInput.text.trim(),
+                        remNotesInput.text.trim(),
+                        dueDate,
+                        hasDate,
+                        isFlagged,
+                        0
+                    );
+                }
+            }
+
+            ColumnLayout {
+                spacing: 12
+                width: parent.width
+
+                // Título
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    radius: CachyTheme.radiusSmall
+                    color: CachyTheme.cardBackground
+                    border.width: 1
+                    border.color: CachyTheme.specularBorder
+
+                    TextInput {
+                        id: remTitleInput
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        color: CachyTheme.textPrimary
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                        clip: true
+
+                        Text {
+                            text: qsTr("Título del recordatorio")
+                            color: CachyTheme.textSecondary
+                            visible: !remTitleInput.text && !remTitleInput.activeFocus
+                            anchors.verticalCenter: parent.verticalCenter
+                            font.pixelSize: 13
+                        }
+                    }
+                }
+
+                // Notas
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 64
+                    radius: CachyTheme.radiusSmall
+                    color: CachyTheme.cardBackground
+                    border.width: 1
+                    border.color: CachyTheme.specularBorder
+
+                    TextEdit {
+                        id: remNotesInput
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        wrapMode: TextEdit.Wrap
+                        color: CachyTheme.textPrimary
+                        font.pixelSize: 12
+                        clip: true
+
+                        Text {
+                            text: qsTr("Notas o detalles adicionales...")
+                            color: CachyTheme.textSecondary
+                            visible: !remNotesInput.text && !remNotesInput.activeFocus
+                            font.pixelSize: 12
+                        }
+                    }
+                }
+
+                // Opciones: Fecha y Marca
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    // Toggle Con marca (Flag)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        radius: CachyTheme.radiusSmall
+                        color: newReminderDialog.isFlagged ? Qt.rgba(1, 0.58, 0, 0.15) : CachyTheme.cardBackground
+                        border.width: 1
+                        border.color: newReminderDialog.isFlagged ? "#FF9500" : CachyTheme.specularBorder
+
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 6
+                            CachyIcon {
+                                name: "pin"
+                                size: 14
+                                color: newReminderDialog.isFlagged ? "#FF9500" : CachyPalette.textMuted
+                            }
+                            Text {
+                                text: qsTr("Con marca")
+                                font.pixelSize: 12
+                                color: newReminderDialog.isFlagged ? "#FF9500" : CachyPalette.text
+                            }
+                        }
+
+                        TapHandler {
+                            onTapped: newReminderDialog.isFlagged = !newReminderDialog.isFlagged
+                        }
+                    }
+
+                    // Toggle Fecha de vencimiento
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        radius: CachyTheme.radiusSmall
+                        color: newReminderDialog.hasDate ? Qt.rgba(0, 0.48, 1, 0.15) : CachyTheme.cardBackground
+                        border.width: 1
+                        border.color: newReminderDialog.hasDate ? "#007AFF" : CachyTheme.specularBorder
+
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 6
+                            CachyIcon {
+                                name: "clock"
+                                size: 14
+                                color: newReminderDialog.hasDate ? "#007AFF" : CachyPalette.textMuted
+                            }
+                            Text {
+                                text: newReminderDialog.hasDate ? newReminderDialog.dueDate.toLocaleDateString() : qsTr("Añadir fecha")
+                                font.pixelSize: 12
+                                color: newReminderDialog.hasDate ? "#007AFF" : CachyPalette.text
+                            }
+                        }
+
+                        TapHandler {
+                            onTapped: {
+                                newReminderDialog.hasDate = !newReminderDialog.hasDate;
+                                if (newReminderDialog.hasDate) {
+                                    newReminderDialog.dueDate = new Date();
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
