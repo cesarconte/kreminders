@@ -1,90 +1,144 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Cesar
+ * SPDX-FileCopyrightText: 2026 CachyOS UI contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+pragma ComponentBehavior: Bound
+
 import QtQuick
-import QtQuick.Layouts
 import CachyOS.UI
 
 Rectangle {
     id: card
-    property color badgeColor: "#007AFF"
-    property string badgeIcon: "📅"
-    property string titleText: "Hoy"
+
+    property color gradientStart: "#3494FA"
+    property color gradientEnd: "#63B4FF"
+    property string badgeIcon: "calendar"
+    property string titleText: qsTr("Hoy")
     property int countValue: 0
+    property bool showCount: true
+    property bool isTodayCalendar: false
     property bool isSelected: false
-    property bool isWide: false
 
     signal clicked()
 
-    radius: CachyTheme.radiusMedium
-    color: isSelected
-        ? CachyTheme.withAlpha(badgeColor, 0.14)
-        : (cardMouse.containsMouse ? CachyTheme.cardBackgroundHover : CachyTheme.cardBackground)
-    border.color: isSelected ? badgeColor : (cardMouse.containsMouse ? CachyTheme.withAlpha(badgeColor, 0.5) : CachyTheme.specularBorder)
-    border.width: isSelected ? 1.5 : 1
+    implicitHeight: 58
+    radius: 11
 
-    Behavior on color { ColorAnimation { duration: CachyTheme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: CachyTheme.animFast } }
+    gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 0.0; color: card.gradientStart }
+        GradientStop { position: 1.0; color: card.gradientEnd }
+    }
 
-    MouseArea {
-        id: cardMouse
+    border.width: card.isSelected ? 2 : 1
+    border.color: card.isSelected ? "#FFFFFF" : Qt.rgba(1, 1, 1, 0.28)
+
+    scale: cardTap.pressed ? 0.97 : 1.0
+    Behavior on scale {
+        NumberAnimation { duration: CachyTheme.animFast; easing.type: Easing.OutCubic }
+    }
+
+    // Subtle specular selection / hover overlay
+    Rectangle {
         anchors.fill: parent
-        hoverEnabled: true
+        radius: card.radius
+        color: cardTap.pressed
+            ? Qt.rgba(0, 0, 0, 0.12)
+            : (cardHover.hovered ? Qt.rgba(1, 1, 1, 0.12) : "transparent")
+        border.width: card.isSelected ? 1 : 0
+        border.color: Qt.rgba(1, 1, 1, 0.65)
+
+        Behavior on color { ColorAnimation { duration: CachyTheme.animFast } }
+    }
+
+    HoverHandler {
+        id: cardHover
         cursorShape: Qt.PointingHandCursor
-        onClicked: card.clicked()
+    }
+
+    TapHandler {
+        id: cardTap
+        onTapped: card.clicked()
     }
 
     Item {
         anchors.fill: parent
-        anchors.margins: 10
+        anchors.leftMargin: 10
+        anchors.rightMargin: 10
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
 
-        // Icon Badge
-        Rectangle {
-            id: iconBadge
+        // Top-Left Icon (Today Calendar with Day Number OR CachyIcon)
+        Item {
+            id: topLeftIcon
             anchors.left: parent.left
-            anchors.top: isWide ? undefined : parent.top
-            anchors.verticalCenter: isWide ? parent.verticalCenter : undefined
-            width: 30
-            height: 30
-            radius: 15
-            color: card.badgeColor
+            anchors.top: parent.top
+            width: 21
+            height: 20
+
+            Rectangle {
+                visible: card.isTodayCalendar
+                anchors.centerIn: parent
+                width: 19
+                height: 19
+                radius: 4
+                color: Qt.rgba(1, 1, 1, 0.18)
+                border.width: 1.4
+                border.color: "#FFFFFF"
+                clip: true
+
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 5
+                    color: "#FFFFFF"
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 1.5
+                    text: new Date().getDate().toString()
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    color: "#FFFFFF"
+                }
+            }
 
             CachyIcon {
-                id: cachyBadgeIcon
+                visible: !card.isTodayCalendar
                 anchors.centerIn: parent
                 name: card.badgeIcon
-                size: 16
+                size: 18
                 color: "#FFFFFF"
-                visible: card.badgeIcon.indexOf("/") === -1 && card.badgeIcon.length > 2 && !card.badgeIcon.match(/[\u{1F300}-\u{1F6FF}]/u)
-            }
-
-            Text {
-                anchors.centerIn: parent
-                text: card.badgeIcon
-                font.pixelSize: 15
-                color: "#FFFFFF"
-                visible: !cachyBadgeIcon.visible
             }
         }
 
-        // Count Number
+        // Top-Right Count Number
         Text {
             anchors.right: parent.right
-            anchors.top: isWide ? undefined : parent.top
-            anchors.verticalCenter: isWide ? parent.verticalCenter : undefined
+            anchors.top: parent.top
+            anchors.topMargin: -2
+            visible: card.showCount
             text: card.countValue.toString()
-            font.pixelSize: 22
+            font.pixelSize: 19
             font.weight: Font.Bold
-            color: CachyTheme.textPrimary
+            color: "#FFFFFF"
         }
 
-        // Label
+        // Bottom-Left Title Label
         Text {
-            anchors.left: isWide ? iconBadge.right : parent.left
-            anchors.leftMargin: isWide ? 10 : 0
-            anchors.bottom: isWide ? undefined : parent.bottom
-            anchors.verticalCenter: isWide ? parent.verticalCenter : undefined
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
             text: card.titleText
-            font.pixelSize: 13
+            font.pixelSize: 12
             font.weight: Font.DemiBold
-            color: card.isSelected ? card.badgeColor : CachyTheme.textSecondary
+            color: "#FFFFFF"
+            elide: Text.ElideRight
         }
     }
 }

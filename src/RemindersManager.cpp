@@ -2,10 +2,31 @@
 #include "DatabaseManager.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QPalette>
+#include <QRegularExpression>
 #include <QStyleHints>
+
+namespace {
+QString normalizeTags(const QString &raw)
+{
+    QStringList out;
+    QSet<QString> seen;
+    const QStringList parts = raw.split(QRegularExpression(QStringLiteral("[\\s,]+")), Qt::SkipEmptyParts);
+    for (QString part : parts) {
+        if (!part.startsWith(QLatin1Char('#'))) {
+            part.prepend(QLatin1Char('#'));
+        }
+        if (part.size() > 1 && !seen.contains(part)) {
+            seen.insert(part);
+            out.append(part);
+        }
+    }
+    return out.join(QLatin1Char(' '));
+}
+}
 
 RemindersManager::RemindersManager(QObject *parent)
     : QObject(parent)
@@ -76,9 +97,33 @@ int RemindersManager::flaggedCount() const
     return DatabaseManager::instance().countFlagged();
 }
 
+int RemindersManager::urgentCount() const
+{
+    return DatabaseManager::instance().countUrgent();
+}
+
 int RemindersManager::completedCount() const
 {
     return DatabaseManager::instance().countCompleted();
+}
+
+int RemindersManager::currentViewCompletedCount() const
+{
+    return DatabaseManager::instance().countCompletedForFilter(m_currentFilter);
+}
+
+int RemindersManager::currentViewTotalCount() const
+{
+    if (m_currentFilter == QStringLiteral("completed")) {
+        return m_filteredReminders.size();
+    }
+    int count = 0;
+    for (const auto &item : m_filteredReminders) {
+        if (!item.isCompleted) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 int RemindersManager::countForList(const QString &listId) const
@@ -86,9 +131,45 @@ int RemindersManager::countForList(const QString &listId) const
     return DatabaseManager::instance().countForList(listId);
 }
 
+QStringList RemindersManager::allTags() const
+{
+    return DatabaseManager::instance().getAllTags();
+}
+
+bool RemindersManager::hasGroceriesList() const
+{
+    for (const auto &l : m_lists) {
+        const QString lower = l.name.trimmed().toLower();
+        if (lower == QLatin1String("compras") || lower == QLatin1String("groceries")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 ReminderList RemindersManager::getList(const QString &listId) const
 {
     return DatabaseManager::instance().getList(listId);
+}
+
+QString RemindersManager::listNameForId(const QString &listId) const
+{
+    for (const auto &l : m_lists) {
+        if (l.id == listId) {
+            return l.name;
+        }
+    }
+    return QStringLiteral("Recordatorios");
+}
+
+QString RemindersManager::listColorForId(const QString &listId) const
+{
+    for (const auto &l : m_lists) {
+        if (l.id == listId) {
+            return l.color;
+        }
+    }
+    return QStringLiteral("#007AFF");
 }
 
 QString RemindersManager::currentTitle() const
@@ -97,7 +178,10 @@ QString RemindersManager::currentTitle() const
     if (m_currentFilter == QStringLiteral("scheduled")) return QStringLiteral("Programados");
     if (m_currentFilter == QStringLiteral("all")) return QStringLiteral("Todos");
     if (m_currentFilter == QStringLiteral("flagged")) return QStringLiteral("Con marca");
+    if (m_currentFilter == QStringLiteral("urgent")) return QStringLiteral("Urgentes");
     if (m_currentFilter == QStringLiteral("completed")) return QStringLiteral("Completadas");
+    if (m_currentFilter == QStringLiteral("tags_all")) return QStringLiteral("Etiquetas");
+    if (m_currentFilter.startsWith(QStringLiteral("tag:"))) return m_currentFilter.mid(4);
 
     for (const auto &l : m_lists) {
         if (l.id == m_currentFilter) return l.name;
@@ -107,11 +191,15 @@ QString RemindersManager::currentTitle() const
 
 QString RemindersManager::currentColor() const
 {
-    if (m_currentFilter == QStringLiteral("today")) return QStringLiteral("#007AFF");
-    if (m_currentFilter == QStringLiteral("scheduled")) return QStringLiteral("#FF3B30");
-    if (m_currentFilter == QStringLiteral("all")) return QStringLiteral("#5856D6");
-    if (m_currentFilter == QStringLiteral("flagged")) return QStringLiteral("#FF9500");
-    if (m_currentFilter == QStringLiteral("completed")) return QStringLiteral("#34C759");
+    if (m_currentFilter == QStringLiteral("today")) return QStringLiteral("#3494FA");
+    if (m_currentFilter == QStringLiteral("scheduled")) return QStringLiteral("#E85755");
+    if (m_currentFilter == QStringLiteral("all")) return QStringLiteral("#4A4D52");
+    if (m_currentFilter == QStringLiteral("flagged")) return QStringLiteral("#EE964B");
+    if (m_currentFilter == QStringLiteral("urgent")) return QStringLiteral("#E55882");
+    if (m_currentFilter == QStringLiteral("completed")) return QStringLiteral("#6E7885");
+    if (m_currentFilter == QStringLiteral("tags_all") || m_currentFilter.startsWith(QStringLiteral("tag:"))) {
+        return QStringLiteral("#007AFF");
+    }
 
     for (const auto &l : m_lists) {
         if (l.id == m_currentFilter) return l.color;
@@ -124,6 +212,24 @@ void RemindersManager::setSearchQuery(const QString &query)
     if (m_searchQuery != query) {
         m_searchQuery = query;
         Q_EMIT searchQueryChanged();
+        updateFilteredTasks();
+    }
+}
+
+void RemindersManager::setShowCompleted(bool show)
+{
+    if (m_showCompleted != show) {
+        m_showCompleted = show;
+        Q_EMIT showCompletedChanged();
+        updateFilteredTasks();
+    }
+}
+
+void RemindersManager::setSortBy(const QString &sortBy)
+{
+    if (m_sortBy != sortBy) {
+        m_sortBy = sortBy;
+        Q_EMIT sortByChanged();
         updateFilteredTasks();
     }
 }
@@ -146,9 +252,19 @@ void RemindersManager::selectCustomList(const QString &listId)
     }
 }
 
+void RemindersManager::selectTagFilter(const QString &tag)
+{
+    const QString target = tag.isEmpty() ? QStringLiteral("tags_all") : (QStringLiteral("tag:") + tag);
+    if (m_currentFilter != target) {
+        m_currentFilter = target;
+        Q_EMIT currentFilterChanged();
+        updateFilteredTasks();
+    }
+}
+
 void RemindersManager::updateFilteredTasks()
 {
-    m_filteredReminders = DatabaseManager::instance().getReminders(m_currentFilter, m_searchQuery);
+    m_filteredReminders = DatabaseManager::instance().getReminders(m_currentFilter, m_searchQuery, m_showCompleted, m_sortBy);
     m_tasksModel->refresh();
     m_listsModel->refresh();
     Q_EMIT countsChanged();
@@ -163,6 +279,7 @@ void RemindersManager::addReminder(const QString &title, const QString &notes, c
     item.hasDueDate = hasDueDate;
     item.isFlagged = isFlagged;
     item.priority = priority;
+    item.isUrgent = (priority == 3);
 
     const QString defaultListId = m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id;
 
@@ -177,7 +294,13 @@ void RemindersManager::addReminder(const QString &title, const QString &notes, c
     } else if (m_currentFilter == QStringLiteral("flagged")) {
         item.listId = defaultListId;
         item.isFlagged = true;
-    } else if (m_currentFilter == QStringLiteral("all") || m_currentFilter == QStringLiteral("completed")) {
+    } else if (m_currentFilter == QStringLiteral("urgent")) {
+        item.listId = defaultListId;
+        item.isUrgent = true;
+    } else if (m_currentFilter.startsWith(QStringLiteral("tag:"))) {
+        item.listId = defaultListId;
+        item.tags = m_currentFilter.mid(4);
+    } else if (m_currentFilter == QStringLiteral("all") || m_currentFilter == QStringLiteral("completed") || m_currentFilter == QStringLiteral("tags_all")) {
         item.listId = defaultListId;
     } else {
         item.listId = m_currentFilter;
@@ -199,9 +322,36 @@ void RemindersManager::toggleFlagged(const QString &id)
     updateFilteredTasks();
 }
 
+void RemindersManager::toggleUrgent(const QString &id)
+{
+    DatabaseManager::instance().toggleUrgent(id);
+    updateFilteredTasks();
+}
+
 void RemindersManager::updateReminder(const QString &id, const QString &title, const QString &notes, const QDateTime &dueDate, bool hasDueDate, bool isFlagged, int priority)
 {
     DatabaseManager::instance().updateReminder(id, title.trimmed(), notes.trimmed(), dueDate, hasDueDate, isFlagged, priority);
+    updateFilteredTasks();
+}
+
+void RemindersManager::updateReminderDetails(const QString &id, const QString &listId, const QString &title, const QString &notes, const QDateTime &dueDate, bool hasDueDate, bool isFlagged, bool isUrgent, int priority, const QString &tags, bool hasDueTime, bool hasLocation, bool whenMessaging)
+{
+    const QString targetListId = listId.isEmpty() ? (m_lists.isEmpty() ? QStringLiteral("default") : m_lists.first().id) : listId;
+    DatabaseManager::instance().updateReminderFull(
+        id,
+        targetListId,
+        title.trimmed(),
+        notes.trimmed(),
+        dueDate,
+        hasDueDate,
+        isFlagged,
+        isUrgent,
+        priority,
+        normalizeTags(tags),
+        hasDueTime,
+        hasLocation,
+        whenMessaging
+    );
     updateFilteredTasks();
 }
 
@@ -209,6 +359,32 @@ void RemindersManager::deleteReminder(const QString &id)
 {
     DatabaseManager::instance().deleteReminder(id);
     updateFilteredTasks();
+}
+
+void RemindersManager::clearCompletedInCurrentView()
+{
+    DatabaseManager::instance().clearCompletedForFilter(m_currentFilter);
+    updateFilteredTasks();
+}
+
+void RemindersManager::copyCurrentListToClipboard()
+{
+    QStringList lines;
+    lines.append(currentTitle() + QStringLiteral(":"));
+    for (const auto &item : m_filteredReminders) {
+        const QString prefix = item.isCompleted ? QStringLiteral("[x] ") : QStringLiteral("[ ] ");
+        QString line = prefix + item.title;
+        if (!item.notes.isEmpty()) {
+            line += QStringLiteral(" — ") + item.notes;
+        }
+        if (!item.tags.isEmpty()) {
+            line += QStringLiteral(" ") + item.tags;
+        }
+        lines.append(line);
+    }
+    if (auto *cb = QApplication::clipboard()) {
+        cb->setText(lines.join(QLatin1Char('\n')));
+    }
 }
 
 void RemindersManager::addList(const QString &name, const QString &color, const QString &icon)
@@ -301,20 +477,28 @@ QVariant TasksModel::data(const QModelIndex &index, int role) const
     case NotesRole: return item.notes;
     case DueDateRole: return item.dueDate;
     case DueDateStrRole: {
-        if (!item.hasDueDate) return QString();
+        if (!item.hasDueDate || !item.dueDate.isValid()) return QString();
         const QDate today = QDate::currentDate();
+        const QString timeSuffix = item.hasDueTime ? QString(QStringLiteral(", ") + item.dueDate.toString(QStringLiteral("HH:mm"))) : QString();
         if (item.dueDate.date() == today) {
-            return QString(QStringLiteral("Hoy, ") + item.dueDate.toString(QStringLiteral("HH:mm")));
+            return QString(QStringLiteral("Hoy") + timeSuffix);
         } else if (item.dueDate.date() == today.addDays(1)) {
-            return QString(QStringLiteral("Mañana, ") + item.dueDate.toString(QStringLiteral("HH:mm")));
+            return QString(QStringLiteral("Mañana") + timeSuffix);
         }
-        return item.dueDate.toString(QStringLiteral("d MMM yyyy, HH:mm"));
+        return QString(item.dueDate.toString(QStringLiteral("d MMM yyyy")) + timeSuffix);
     }
     case HasDueDateRole: return item.hasDueDate;
-    case IsOverdueRole: return item.hasDueDate && !item.isCompleted && item.dueDate < QDateTime::currentDateTime();
+    case HasDueTimeRole: return item.hasDueTime;
+    case IsOverdueRole:
+        return item.hasDueDate && !item.isCompleted && item.dueDate.isValid() &&
+            (item.hasDueTime ? (item.dueDate < QDateTime::currentDateTime()) : (item.dueDate.date() < QDate::currentDate()));
     case IsCompletedRole: return item.isCompleted;
     case IsFlaggedRole: return item.isFlagged;
+    case IsUrgentRole: return item.isUrgent;
     case PriorityRole: return item.priority;
+    case TagsRole: return item.tags;
+    case HasLocationRole: return item.hasLocation;
+    case WhenMessagingRole: return item.whenMessaging;
     case ListColorRole: return list.color.isEmpty() ? QStringLiteral("#007AFF") : list.color;
     case ListNameRole: return list.name.isEmpty() ? QStringLiteral("Recordatorios") : list.name;
     default: return QVariant();
@@ -331,10 +515,15 @@ QHash<int, QByteArray> TasksModel::roleNames() const
         {DueDateRole, "dueDate"},
         {DueDateStrRole, "dueDateStr"},
         {HasDueDateRole, "hasDueDate"},
+        {HasDueTimeRole, "hasDueTime"},
         {IsOverdueRole, "isOverdue"},
         {IsCompletedRole, "isCompleted"},
         {IsFlaggedRole, "isFlagged"},
+        {IsUrgentRole, "isUrgent"},
         {PriorityRole, "priority"},
+        {TagsRole, "tags"},
+        {HasLocationRole, "hasLocation"},
+        {WhenMessagingRole, "whenMessaging"},
         {ListColorRole, "listColor"},
         {ListNameRole, "listName"}
     };

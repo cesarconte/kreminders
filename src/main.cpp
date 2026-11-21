@@ -37,8 +37,7 @@ int main(int argc, char *argv[])
     auto *manager = new RemindersManager(&app);
 
     QQmlApplicationEngine engine;
-    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/lib/qt6/qml"));
-    engine.addImportPath(QStringLiteral("/home/cesar/Proyectos/cachyos-ui/build/src"));
+    engine.addImportPath(QStringLiteral("/usr/lib/qt6/qml"));
 
     engine.rootContext()->setContextProperty(QStringLiteral("remindersManager"), manager);
 

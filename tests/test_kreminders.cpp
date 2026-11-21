@@ -12,6 +12,7 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QStandardPaths>
 #include <QTest>
 
 class TestKReminders : public QObject
@@ -21,8 +22,11 @@ class TestKReminders : public QObject
 private Q_SLOTS:
     void initTestCase()
     {
-        // Set temp database path or unique test environment
+        // Set temp database path and offscreen QPA for automated tests
         qputenv("QT_QPA_PLATFORM", "offscreen");
+        QStandardPaths::setTestModeEnabled(true);
+        const QString testDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir(testDataDir).removeRecursively();
     }
 
     void testRemindersManagerBasicOps()
@@ -66,7 +70,35 @@ private Q_SLOTS:
         QCOMPARE(manager.currentFilter(), QStringLiteral("flagged"));
         QCOMPARE(manager.currentTitle(), QStringLiteral("Con marca"));
 
-        // 4. Test Add and Delete Custom List
+        manager.selectSmartList(QStringLiteral("urgent"));
+        QCOMPARE(manager.currentFilter(), QStringLiteral("urgent"));
+        QCOMPARE(manager.currentTitle(), QStringLiteral("Urgentes"));
+
+        // 4. Test Urgent, Tags & Update Details
+        manager.addReminder(QStringLiteral("Graphite"),
+                            QStringLiteral(""),
+                            QDateTime(),
+                            false,
+                            false,
+                            0);
+        const auto idx = manager.tasksModel()->index(0, 0);
+        const QString createdId = manager.tasksModel()->data(idx, TasksModel::IdRole).toString();
+        QVERIFY(!createdId.isEmpty());
+
+        manager.updateReminderDetails(createdId,
+                                      QStringLiteral("default"),
+                                      QStringLiteral("Graphite"),
+                                      QStringLiteral("Color iMac"),
+                                      QDateTime(),
+                                      false,
+                                      true,
+                                      true,
+                                      3,
+                                      QStringLiteral("Not-orange"));
+        QVERIFY(manager.urgentCount() >= 1);
+        QVERIFY(manager.allTags().contains(QStringLiteral("#Not-orange")));
+
+        // 5. Test Add Custom List
         manager.addList(QStringLiteral("Trabajo"), QStringLiteral("#FF9500"), QStringLiteral("briefcase"));
         QVERIFY(manager.listsModel() != nullptr);
     }
@@ -74,8 +106,7 @@ private Q_SLOTS:
     void testQmlSyntaxAndCachyWindow()
     {
         QQmlEngine engine;
-        engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/lib/qt6/qml"));
-        engine.addImportPath(QStringLiteral("/home/cesar/Proyectos/cachyos-ui/build/src"));
+        engine.addImportPath(QStringLiteral("/usr/lib/qt6/qml"));
 
         auto *manager = new RemindersManager(&engine);
         engine.rootContext()->setContextProperty(QStringLiteral("remindersManager"), manager);

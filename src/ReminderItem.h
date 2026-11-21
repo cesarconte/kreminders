@@ -12,9 +12,14 @@ struct ReminderItem {
     QString notes;
     QDateTime dueDate;
     bool hasDueDate = false;
+    bool hasDueTime = true;
     bool isCompleted = false;
     bool isFlagged = false;
+    bool isUrgent = false;
     int priority = 0; // 0=None, 1=Low (!), 2=Medium (!!), 3=High (!!!)
+    QString tags;
+    bool hasLocation = false;
+    bool whenMessaging = false;
     QDateTime createdDate = QDateTime::currentDateTime();
     QDateTime completedDate;
 
@@ -26,9 +31,14 @@ struct ReminderItem {
         obj[QStringLiteral("notes")] = notes;
         obj[QStringLiteral("dueDate")] = dueDate.toString(Qt::ISODate);
         obj[QStringLiteral("hasDueDate")] = hasDueDate;
+        obj[QStringLiteral("hasDueTime")] = hasDueTime;
         obj[QStringLiteral("isCompleted")] = isCompleted;
         obj[QStringLiteral("isFlagged")] = isFlagged;
+        obj[QStringLiteral("isUrgent")] = isUrgent;
         obj[QStringLiteral("priority")] = priority;
+        obj[QStringLiteral("tags")] = tags;
+        obj[QStringLiteral("hasLocation")] = hasLocation;
+        obj[QStringLiteral("whenMessaging")] = whenMessaging;
         obj[QStringLiteral("createdDate")] = createdDate.toString(Qt::ISODate);
         if (completedDate.isValid()) {
             obj[QStringLiteral("completedDate")] = completedDate.toString(Qt::ISODate);
@@ -44,9 +54,14 @@ struct ReminderItem {
         item.notes = obj.value(QStringLiteral("notes")).toString();
         item.dueDate = QDateTime::fromString(obj.value(QStringLiteral("dueDate")).toString(), Qt::ISODate);
         item.hasDueDate = obj.value(QStringLiteral("hasDueDate")).toBool(false);
+        item.hasDueTime = obj.value(QStringLiteral("hasDueTime")).toBool(true);
         item.isCompleted = obj.value(QStringLiteral("isCompleted")).toBool(false);
         item.isFlagged = obj.value(QStringLiteral("isFlagged")).toBool(false);
+        item.isUrgent = obj.value(QStringLiteral("isUrgent")).toBool(false);
         item.priority = obj.value(QStringLiteral("priority")).toInt(0);
+        item.tags = obj.value(QStringLiteral("tags")).toString();
+        item.hasLocation = obj.value(QStringLiteral("hasLocation")).toBool(false);
+        item.whenMessaging = obj.value(QStringLiteral("whenMessaging")).toBool(false);
         item.createdDate = QDateTime::fromString(obj.value(QStringLiteral("createdDate")).toString(), Qt::ISODate);
         if (obj.contains(QStringLiteral("completedDate"))) {
             item.completedDate = QDateTime::fromString(obj.value(QStringLiteral("completedDate")).toString(), Qt::ISODate);
